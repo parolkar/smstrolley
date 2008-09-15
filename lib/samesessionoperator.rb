@@ -1,3 +1,26 @@
+# Copyright (c) 2008 Abhishek Parolkar , Parolkar.com
+# 
+# Permission is hereby granted, free of charge, to any person
+# obtaining a copy of this software and associated documentation
+# files (the "Software"), to deal in the Software without
+# restriction, including without limitation the rights to use,
+# copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following
+# conditions:
+# 
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+# OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
 require 'rubygems'
 require 'eventmachine'
 require 'mongrel'
@@ -7,8 +30,9 @@ class SameSessionConnection  < EventMachine::Connection
 	include EM::Deferrable
 
    	attr_writer :operator
-   	attr_reader :operator
+   	attr_reader :operator, :consumed
 	def initialize *args
+		@consumed = false #flag to keep track of consumption
 		@operator = nil
 		super
 		@linebuffer = ""
@@ -25,6 +49,7 @@ class SameSessionConnection  < EventMachine::Connection
 	
 	def unbind
 		@operator.log.info "Connection closed"
+		@consumed = true
 	end
 	
 	def process_request(request)
@@ -53,12 +78,15 @@ class SameSessionConnection  < EventMachine::Connection
 				]
 			send_data responseHeader.join("\n")+"\n\n#{response}\r\n"
 			close_connection_after_writing
+			#Mind it, even after closing the connection the connection object is still in memory, find some way to get rid of it... 
 			}		
 		 
 		#puts "=================#{YAML.dump(@operator.connection_pool)}=============="		
 		EM::Timer.new(@operator.config["session_timeout"]) {
 			default_response = @operator.config["default_timeout_message"] 
 			self.consume default_response
+			
+
 		}
 		
 					
@@ -112,10 +140,48 @@ class SameSessionOperator < Operator
       super default_config.merge(config)
    end 
 
+   
+
    def start
 	 EventMachine::start_server(@config["bindip"],@config["bindport"],SameSessionConnection){|sameSessionConnectionObj| sameSessionConnectionObj.operator = self }
 	
    end
+
+   def can_deliver_message_to(to_number)
+	#puts "Connection pool -------\n #{YAML.dump(@connection_pool)}------" 
+
+	if @connection_pool[to_number] && @connection_pool[to_number].length > 0 
+		pool = @connection_pool[to_number]
+		pool.each_with_index { |conn,index|
+			if conn.consumed && conn.consumed == true
+				#Come on, dont do anything, Well, look this space for destroying Connection objects in future
+			else
+			   return index	
+
+			end			
+
+		}
+		return false
+	else 
+		return false
+
+	end	
+   
+   end
+
+
+   def deliver_message(message_hash)
+	to =message_hash['to']
+	message = message_hash['message']
+	can_send_index = can_deliver_message_to(message_hash['to'])
+	if  can_send_index != false
+	  	@connection_pool[to][can_send_index].consume(message)	
+		return true
+	else
+		return false
+	end
+   end
+
 
 end
 

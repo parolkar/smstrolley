@@ -1,3 +1,26 @@
+# Copyright (c) 2008 Abhishek Parolkar , Parolkar.com
+# 
+# Permission is hereby granted, free of charge, to any person
+# obtaining a copy of this software and associated documentation
+# files (the "Software"), to deal in the Software without
+# restriction, including without limitation the rights to use,
+# copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following
+# conditions:
+# 
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+# OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
 require 'rubygems'
 require 'eventmachine'
 require 'mongrel'
@@ -23,7 +46,7 @@ class HttpConsumerConnection  < EventMachine::Connection
 	end
 	
 	def unbind
-		@consumer.log.info "Connection closed"
+		@consumer.log.info "Consumer Connection closed"
 	end
 	
 	def process_request(request)
@@ -41,21 +64,23 @@ class HttpConsumerConnection  < EventMachine::Connection
 
                 request_path = request.header['REQUEST_PATH']
 		elem = request_path.split("/")	
-		if  elem.length < 2
+		
+		if  elem.length < 3
 			send_data responseHeader.join("\n")+"\n\nAlive!\r\n"
 			close_connection_after_writing
 			return
 		end		
-
-		query = elem[0]
-		output_format= elem[1]
+		
+		tmp_nil = elem[0]
+		query = elem[1]
+		output_format= elem[2]
 		params_hash = request.params
 		
 		if query == "can_deliver"
-			output_hash = can_send(params_hash)
+			output_hash = @consumer.can_send(params_hash)
 		
 		elsif query == "deliver_msg"
-			output_hash = deliver_msg(params_hash)
+			output_hash = @consumer.deliver_msg(params_hash)
 		else
 			output_hash['status'] = "failed"
 			output_hash['message'] = "Invalid Query"

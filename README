@@ -1,11 +1,12 @@
 SMSTrolley 0.1
 
-  I am writing this app because I have faced enough problems and struggled all my to find a good piece of code that helps me create massively large SMS based application. This is the piece of code which I wish I had when I was building my SMS app. 
+  I am writing this app because I have faced enough problems and struggled all my way to find a good piece of code that helps me create massively large SMS based application. This is the piece of code which I wish I had when I was building my SMS app. 
 
 Goal of SMSTrolley:
 -High Performance Server (Evented) that handles incoming and outgoing messages (Mind it I am not calling them MO and MT :-))
 -Scalable , i.e Plugin based
 -Intelligent Cost-model, used to take decision on which SMSC to choose on which event
+-Capability to handle same-session operator messages for premium short codes
 -...many more
 
 
